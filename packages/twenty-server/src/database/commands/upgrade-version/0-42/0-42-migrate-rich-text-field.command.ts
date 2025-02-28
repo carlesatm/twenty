@@ -7,12 +7,11 @@ import { FieldMetadataType, isDefined } from 'twenty-shared';
 import { Repository } from 'typeorm';
 
 import { isCommandLogger } from 'src/database/commands/logger';
-import {
-  ActiveWorkspacesMigrationCommandOptions,
-  ActiveWorkspacesMigrationCommandRunner,
-} from 'src/database/commands/migration-command/active-workspaces-migration-command.runner';
 import { MigrationCommand } from 'src/database/commands/migration-command/decorators/migration-command.decorator';
-import { FeatureFlagKey } from 'src/engine/core-modules/feature-flag/enums/feature-flag-key.enum';
+import {
+  MaintainedWorkspacesMigrationCommandOptions,
+  MaintainedWorkspacesMigrationCommandRunner,
+} from 'src/database/commands/migration-command/maintained-workspaces-migration-command.runner';
 import { FeatureFlag } from 'src/engine/core-modules/feature-flag/feature-flag.entity';
 import { Workspace } from 'src/engine/core-modules/workspace/workspace.entity';
 import { FieldMetadataEntity } from 'src/engine/metadata-modules/field-metadata/field-metadata.entity';
@@ -59,7 +58,7 @@ type ProcessRichTextFieldsArgs = {
 };
 
 type MigrateRichTextFieldCommandOptions =
-  ActiveWorkspacesMigrationCommandOptions & {
+  MaintainedWorkspacesMigrationCommandOptions & {
     force?: boolean;
   };
 
@@ -68,7 +67,7 @@ type MigrateRichTextFieldCommandOptions =
   description: 'Migrate RICH_TEXT fields to new composite structure',
   version: '0.42',
 })
-export class MigrateRichTextFieldCommand extends ActiveWorkspacesMigrationCommandRunner<MigrateRichTextFieldCommandOptions> {
+export class MigrateRichTextFieldCommand extends MaintainedWorkspacesMigrationCommandRunner<MigrateRichTextFieldCommandOptions> {
   private options: MigrateRichTextFieldCommandOptions;
 
   constructor(
@@ -99,7 +98,7 @@ export class MigrateRichTextFieldCommand extends ActiveWorkspacesMigrationComman
     return val ?? false;
   }
 
-  async runMigrationCommandOnActiveWorkspaces(
+  async runMigrationCommandOnMaintainedWorkspaces(
     _passedParam: string[],
     options: MigrateRichTextFieldCommandOptions,
     workspaceIds: string[],
@@ -174,8 +173,6 @@ export class MigrateRichTextFieldCommand extends ActiveWorkspacesMigrationComman
         workspaceId,
       });
 
-      await this.enableRichTextV2FeatureFlag(workspaceId);
-
       if (!this.options.dryRun) {
         await this.workspaceMetadataVersionService.incrementMetadataVersion(
           workspaceId,
@@ -187,24 +184,6 @@ export class MigrateRichTextFieldCommand extends ActiveWorkspacesMigrationComman
       );
     } catch (error) {
       this.logger.log(chalk.red(`Error in workspace ${workspaceId}: ${error}`));
-    }
-  }
-
-  private async enableRichTextV2FeatureFlag(
-    workspaceId: string,
-  ): Promise<void> {
-    if (!this.options.dryRun) {
-      await this.featureFlagRepository.upsert(
-        {
-          workspaceId,
-          key: FeatureFlagKey.IsRichTextV2Enabled,
-          value: true,
-        },
-        {
-          conflictPaths: ['workspaceId', 'key'],
-          skipUpdateIfNoValuesChanged: true,
-        },
-      );
     }
   }
 
